@@ -24,21 +24,13 @@
 #endif
 
 #include "output.h"
-
-struct vk_device {
-  int a;
-};
-
-struct vk_device *vk_device_create(struct device *device)
-{
-  struct vk_device *ret = calloc(1, sizeof(ret));
-  return ret;
-}
+#include "vk_device.h"
 
 static struct device *device_open(const char *filename) {
   int err = 0;
 
   struct device *ret = calloc(1, sizeof(*ret));
+  assert(ret);
 
   ret->kms_fd = open(filename, O_RDWR | O_CLOEXEC, 0);
   if (ret->kms_fd < 0) {
@@ -60,7 +52,7 @@ static struct device *device_open(const char *filename) {
     goto err_fd;
   }
 
-  err |= drmSetClientCap(ret->kms_fd, DRM_CLIENT_CAP_ATOMIC, 1);
+  err = drmSetClientCap(ret->kms_fd, DRM_CLIENT_CAP_ATOMIC, 1);
   if (err != 0) {
     fprintf(stderr, "no support for atomic\n");
     goto err_fd;

@@ -9,6 +9,7 @@ includes = include_directories('include')
 sources = [
 	'src/main.c',
 	'src/device.c',
+	'src/vk_device.c',
 	'src/output.c'
 ]
 
