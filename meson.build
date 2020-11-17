@@ -4,8 +4,12 @@ dependencies = [
   dependency('libdrm')
 ]
 
+includes = include_directories('include')
+
 sources = [
-	'src/main.c'
+	'src/main.c',
+	'src/device.c',
+	'src/output.c'
 ]
 
-executable('gfx', sources, dependencies: dependencies)
+executable('gfx', sources, dependencies: dependencies, include_directories: includes)
