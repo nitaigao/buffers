@@ -24,7 +24,7 @@
 #define O_CLOEXEC	02000000  /* set close_on_exec */
 #endif
 
-#include "output.h"device_open
+#include "output.h"
 #include "vk_device.h"
 
 static struct device *device_open(const char *filename) {
@@ -39,33 +39,33 @@ static struct device *device_open(const char *filename) {
     goto err;
   }
 
-  drm_magic_t magic;
-  int cookie = drmGetMagic(ret->kms_fd, &magic);
-  int auth = drmAuthMagic(ret->kms_fd, magic);
-  if (cookie != 0 || auth != 0) {
-    fprintf(stderr, "KMS device %s is not master\n", filename);
-    goto err_fd;
-  }
+  // drm_magic_t magic;
+  // int cookie = drmGetMagic(ret->kms_fd, &magic);
+  // int auth = drmAuthMagic(ret->kms_fd, magic);
+  // if (cookie != 0 || auth != 0) {
+  //   fprintf(stderr, "KMS device %s is not master\n", filename);
+  //   goto err_fd;
+  // }
 
   err = drmSetClientCap(ret->kms_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
 
   if (err != 0) {
-		fprintf(stderr, "No support for universal planes\n");
-		goto err_fd;
-	}
+    fprintf(stderr, "No support for universal planes\n");
+    goto err_fd;
+  }
 
-	err = drmSetClientCap(ret->kms_fd, DRM_CLIENT_CAP_ATOMIC, 1);
-	if (err != 0) {
-		fprintf(stderr, "No support for atomic\n");
-		goto err_fd;
-	}
+  err = drmSetClientCap(ret->kms_fd, DRM_CLIENT_CAP_ATOMIC, 1);
+  if (err != 0) {
+    fprintf(stderr, "No support for atomic\n");
+    goto err_fd;
+  }
 
   uint64_t cap = 0;
 
-	err = drmGetCap(ret->kms_fd, DRM_CAP_ADDFB2_MODIFIERS, &cap);
-	ret->fb_modifiers = (err == 0 && cap != 0);
+  err = drmGetCap(ret->kms_fd, DRM_CAP_ADDFB2_MODIFIERS, &cap);
+  ret->fb_modifiers = (err == 0 && cap != 0);
 
-	printf("Device %s framebuffer modifiers\n",
+  printf("Device %s framebuffer modifiers\n",
     (ret->fb_modifiers) ? "supports" : "does not support");
 
   ret->res = drmModeGetResources(ret->kms_fd);
@@ -112,7 +112,6 @@ static struct device *device_open(const char *filename) {
     ret->outputs[ret->num_outputs++] = output;
   }
 
-
   if (ret->num_outputs == 0) {
     fprintf(stderr, "Device %s has no active outputs\n", filename);
     goto err_outputs;
@@ -120,7 +119,7 @@ static struct device *device_open(const char *filename) {
 
   ret->gbm_device = gbm_create_device(ret->kms_fd);
 
-  struct vk_device *vulkan_device  = vk_device_create(ret);
+  struct vk_device *vulkan_device = vk_device_create(ret);
   (void)vulkan_device;
 
   printf("Using device %s with %d outputs and %d planes\n", filename,

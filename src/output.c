@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdbool.h>
 
 #include <xf86drm.h>
@@ -40,29 +41,29 @@ static drmModeCrtcPtr find_crtc(struct device *device, drmModeEncoderPtr encoder
 
 static bool drm_is_primary_plane(struct device *device, uint32_t plane_id)
 {
-	uint32_t p;
-	bool found = false;
-	bool ret = false;
-	drmModeObjectPropertiesPtr props =
+  uint32_t p;
+  bool found = false;
+  bool ret = false;
+  drmModeObjectPropertiesPtr props =
     drmModeObjectGetProperties(device->kms_fd, plane_id, DRM_MODE_OBJECT_PLANE);
-	if (!props) {
-		return false;
-	}
-	for (p = 0; p < props->count_props && !found; p++) {
-		drmModePropertyPtr prop = drmModeGetProperty(device->kms_fd, props->props[p]);
-		if (prop) {
-			if (strcmp("type", prop->name) == 0) {
-				found = true;
-				ret = props->prop_values[p] == DRM_PLANE_TYPE_PRIMARY;
-			}
-			drmModeFreeProperty(prop);
-		}
-	}
-	drmModeFreeObjectProperties(props);
-	return ret;
+  if (!props) {
+    return false;
+  }
+  for (p = 0; p < props->count_props && !found; p++) {
+    drmModePropertyPtr prop = drmModeGetProperty(device->kms_fd, props->props[p]);
+    if (prop) {
+      if (strcmp("type", prop->name) == 0) {
+        found = true;
+        ret = props->prop_values[p] == DRM_PLANE_TYPE_PRIMARY;
+      }
+      drmModeFreeProperty(prop);
+    }
+  }
+  drmModeFreeObjectProperties(props);
+  return ret;
 }
 
-static drmModePlanePtr find_primary_plan(struct device *device, drmModeCrtcPtr crtc) {
+static drmModePlanePtr find_primary_plane(struct device *device) {
   for (int p = 0; p < device->num_planes; p++) {
     drmModePlanePtr plane = device->planes[p];
     int is_plane = drm_is_primary_plane(device, plane->plane_id);
@@ -84,7 +85,7 @@ struct output* output_new(
   drmModeModeInfoPtr mode_info,
   int64_t refresh_nsec
 ) {
-  struct output *ret = calloc(1, sizeof(ret));
+  struct output *ret = calloc(1, sizeof(*ret));
   assert(ret);
 
   ret->device = device;
@@ -99,13 +100,12 @@ struct output* output_new(
 
 static int64_t millihz_to_nsec(uint32_t mhz)
 {
-	assert(mhz > 0);
-	return 1000000000000LL / mhz;
+  assert(mhz > 0);
+  return 1000000000000LL / mhz;
 }
 
 struct output *output_create(struct device *device, drmModeConnectorPtr connector)
 {
-  int err = 0;
   struct output *ret = NULL;
 
   if (connector->encoder_id == 0) {
@@ -129,7 +129,7 @@ struct output *output_create(struct device *device, drmModeConnectorPtr connecto
     goto err_crtc;
   }
 
-  drmModePlanePtr primary_plane = find_primary_plan(device, encoder);
+  drmModePlanePtr primary_plane = find_primary_plane(device);
   assert(primary_plane);
 
   uint64_t refresh_millihz = ((crtc->mode.clock * 1000000LL / crtc->mode.htotal) +

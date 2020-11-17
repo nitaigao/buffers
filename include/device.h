@@ -20,4 +20,6 @@ struct device {
   struct gbm_device *gbm_device;
 };
 
+struct device* device_create();
+
 #endif  // DEVICE_H_
