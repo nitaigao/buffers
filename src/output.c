@@ -2,6 +2,8 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <stdbool.h>
 
 #include <xf86drm.h>
 #include <xf86drmMode.h>
@@ -9,14 +11,11 @@
 #include "device.h"
 
 static drmModeEncoderPtr find_encoder(struct device *device, drmModeConnectorPtr connector) {
-  if (connector->encoder_id == 0) {
-    printf("No encoder for %d\n", connector->connector_id);
-    return NULL;
-  }
-
   for (int i = 0; i < device->res->count_encoders; i++) {
-    if (device->res->encoders[i] == connector->encoder_id) {
-      return device->res->encoders[i];
+    uint32_t encoder_id = device->res->encoders[i];
+    if (encoder_id == connector->encoder_id) {
+      drmModeEncoderPtr encoder = drmModeGetEncoder(device->kms_fd, encoder_id);
+      return encoder;
     }
   }
 
@@ -25,32 +24,54 @@ static drmModeEncoderPtr find_encoder(struct device *device, drmModeConnectorPtr
   return NULL;
 }
 
-static drmModeCrtcPtr find_crtc(struct device *device, drmModeCrtcPtr crtc) {
-  for (int p = 0; p < device->num_planes; p++) {
-    if (device->planes[p]->crtc_id == crtc->crtc_id &&
-        device->planes[p]->fb_id == crtc->buffer_id) {
-      return device->planes[p];
-    }
-  }
-
-  printf("Could not find primary plan\n");
-
-  return NULL;
-}
-
-static drmModePlanePtr find_primary_plan(struct device *device, drmModeEncoderPtr encoder) {
-  if (encoder->crtc_id == 0) {
-    printf("No CRTC for %d\n", encoder->encoder_id);
-    return NULL;
-  }
-
+static drmModeCrtcPtr find_crtc(struct device *device, drmModeEncoderPtr encoder) {
   for (int i = 0; i < device->res->count_crtcs; i++) {
-    if (device->res->crtcs[i] == encoder->crtc_id) {
-      return device->res->crtcs[i];
+    uint32_t crtc_id = device->res->crtcs[i];
+    if (crtc_id == encoder->crtc_id) {
+      drmModeCrtcPtr crtc = drmModeGetCrtc(device->kms_fd, crtc_id);
+      return crtc;
     }
   }
 
   printf("Could not find CRTC\n");
+
+  return NULL;
+}
+
+static bool drm_is_primary_plane(struct device *device, uint32_t plane_id)
+{
+	uint32_t p;
+	bool found = false;
+	bool ret = false;
+	drmModeObjectPropertiesPtr props =
+    drmModeObjectGetProperties(device->kms_fd, plane_id, DRM_MODE_OBJECT_PLANE);
+	if (!props) {
+		return false;
+	}
+	for (p = 0; p < props->count_props && !found; p++) {
+		drmModePropertyPtr prop = drmModeGetProperty(device->kms_fd, props->props[p]);
+		if (prop) {
+			if (strcmp("type", prop->name) == 0) {
+				found = true;
+				ret = props->prop_values[p] == DRM_PLANE_TYPE_PRIMARY;
+			}
+			drmModeFreeProperty(prop);
+		}
+	}
+	drmModeFreeObjectProperties(props);
+	return ret;
+}
+
+static drmModePlanePtr find_primary_plan(struct device *device, drmModeCrtcPtr crtc) {
+  for (int p = 0; p < device->num_planes; p++) {
+    drmModePlanePtr plane = device->planes[p];
+    int is_plane = drm_is_primary_plane(device, plane->plane_id);
+    if (is_plane) {
+      return plane;
+    }
+  }
+
+  printf("Could not find primary plan\n");
 
   return NULL;
 }
@@ -70,6 +91,8 @@ struct output* output_new(
   ret->primary_plane_id = primary_plane_id;
   ret->crtc_id = crtc_id;
   ret->connector_id = connector_id;
+  ret->mode_info = mode_info;
+  ret->refresh_nsec = refresh_nsec;
 
   return ret;
 }
@@ -85,10 +108,20 @@ struct output *output_create(struct device *device, drmModeConnectorPtr connecto
   int err = 0;
   struct output *ret = NULL;
 
+  if (connector->encoder_id == 0) {
+    printf("No encoder for %d\n", connector->connector_id);
+    return NULL;
+  }
+
   drmModeEncoderPtr encoder = find_encoder(device, connector);
   assert(encoder);
 
-  drmModeCrtcPtr crtc = find_crtc(device, connector);
+  if (encoder->crtc_id == 0) {
+    printf("No CRTC for %d\n", encoder->encoder_id);
+    goto err_encoder;
+  }
+
+  drmModeCrtcPtr crtc = find_crtc(device, encoder);
   assert(crtc);
 
   if (crtc->buffer_id == 0) {
@@ -104,8 +137,6 @@ struct output *output_create(struct device *device, drmModeConnectorPtr connecto
 
   int64_t refresh_nsec = millihz_to_nsec(refresh_millihz);
 
-  uint32_t mode_blob_id = mode_blob_create(device, &crtc->mode);
-
   ret = output_new(
     device,
     primary_plane->plane_id,
@@ -114,8 +145,13 @@ struct output *output_create(struct device *device, drmModeConnectorPtr connecto
     &crtc->mode,
     refresh_nsec);
 
+  assert(ret);
+
 err_crtc:
   drmModeFreeCrtc(crtc);
+
+err_encoder:
+  drmModeFreeEncoder(encoder);
 
   return ret;
 }

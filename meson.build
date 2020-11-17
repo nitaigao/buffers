@@ -1,7 +1,10 @@
 project('gfx', 'c', default_options: ['warning_level=3', 'c_std=c17'])
 
 dependencies = [
-  dependency('libdrm')
+  dependency('libdrm'),
+  dependency('gbm'),
+  dependency('egl'),
+  dependency('vulkan')
 ]
 
 includes = include_directories('include')
