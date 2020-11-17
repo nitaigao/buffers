@@ -6,11 +6,18 @@ dependencies = [
 
 includes = include_directories('include')
 
-sources = [
+library_sources = [
 	'src/main.c',
 	'src/device.c',
 	'src/vk_device.c',
 	'src/output.c'
 ]
 
-executable('gfx', sources, dependencies: dependencies, include_directories: includes)
+executable_sources = [
+	'src/main.c',
+	'src/device.c',
+	'src/vk_device.c',
+	'src/output.c'
+]
+
+executable('gfx', [library_sources, executable_sources], dependencies: dependencies, include_directories: includes)
