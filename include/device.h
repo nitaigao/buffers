@@ -18,6 +18,7 @@ struct device {
   bool fb_modifiers;
 
   struct gbm_device *gbm_device;
+  struct vk_device *vk_device;
 };
 
 struct device* device_create();

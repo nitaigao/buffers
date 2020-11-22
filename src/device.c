@@ -119,8 +119,7 @@ static struct device *device_open(const char *filename) {
 
   ret->gbm_device = gbm_create_device(ret->kms_fd);
 
-  struct vk_device *vulkan_device = vk_device_create(ret);
-  (void)vulkan_device;
+  ret->vk_device = vk_device_create(ret);
 
   printf("Using device %s with %d outputs and %d planes\n", filename,
     ret->num_outputs, ret->num_planes);
